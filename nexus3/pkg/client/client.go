@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
@@ -26,18 +28,21 @@ type Client struct {
 
 // NewClient returns an instance of client that implements the Client interface
 func NewClient(config Config) *Client {
+	retryClient := retryablehttp.NewClient()
+	retryClient.HTTPClient = &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: config.Insecure,
+			},
+		},
+	}
+
 	return &Client{
 		config:      config,
 		contentType: ContentTypeApplicationJSON,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: config.Insecure,
-				},
-			},
-		},
+		httpClient:  retryClient.StandardClient(),
 	}
 }
 
